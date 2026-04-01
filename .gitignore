@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+
+# Local config
+local.properties
+*.iml
+
+# IDE
+.idea/
+*.class
+
+# Kotlin
+**/*.kotlin_module
+
+# Android Studio generated
+captures/
+.externalNativeBuild/
+.cxx/
