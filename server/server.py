@@ -19,7 +19,7 @@ import audio_pb2_grpc
 SAVE_DIR = os.path.join(os.path.dirname(__file__), "recordings")
 PORT = 50051
 STEP_SECONDS = 0.5
-WINDOW_SECONDS = 10
+WINDOW_SECONDS = 5 
 DEBUG_SAVE_WAV = os.environ.get("DEBUG_SAVE_WAV", "false").lower() == "true"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
