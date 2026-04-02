@@ -51,6 +51,16 @@ class AppViewModel : ViewModel() {
             recordingJob?.join()
             val audio = recordedAudio
             if (audio != null && audio.isNotEmpty()) {
+                viewModelScope.launch {
+                    AudioUploadClient.uploadPcm(
+                        pcmData = audio,
+                        sampleRate = recorderModel.sampleRate,
+                        channels = 1,
+                        bitDepth = 16,
+                    ).onFailure { e ->
+                        android.util.Log.w("AppViewModel", "Upload failed: ${e.message}")
+                    }
+                }
                 playerModel.play(audio) {
                     _state.value = RecorderState.IDLE
                 }

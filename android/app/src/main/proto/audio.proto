@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package audio;
+
+option java_package = "com.voice.recorder.generated";
+option java_outer_classname = "AudioProto";
+option java_multiple_files = true;
+
+service AudioService {
+  rpc UploadAudio (AudioRequest) returns (AudioResponse);
+}
+
+message AudioRequest {
+  bytes  pcm_data    = 1;
+  int32  sample_rate = 2;
+  int32  channels    = 3;
+  int32  bit_depth   = 4;
+}
+
+message AudioResponse {
+  bool   success = 1;
+  string message = 2;
+}

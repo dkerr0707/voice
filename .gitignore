@@ -20,3 +20,17 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Server generated proto stubs
+server/generated/
+
+# Recorded audio files
+server/recordings/
