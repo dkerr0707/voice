@@ -60,8 +60,6 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
         full_audio = np.array([], dtype=np.float32)
         full_pcm = bytearray()
 
-        print("\n--- Live Transcription ---", flush=True)
-
         for chunk in request_iterator:
             sample_rate = chunk.sample_rate
             full_pcm.extend(chunk.pcm_data)
@@ -74,9 +72,8 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
                 window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
                 window_secs = len(window) / sample_rate
                 text, elapsed_ms = _transcribe(window)
-                logger.info(f"window={window_secs:.1f}s  time={elapsed_ms:.0f}ms  rtf={elapsed_ms / (window_secs * 1000):.2f}x")
+                logger.info(f"{window_secs:.1f}s  {elapsed_ms:.0f}ms  {text}")
                 if text:
-                    print(f"\r{text}", flush=True)
                     yield audio_pb2.TranscriptionChunk(text=text)
                 step_buffer = np.array([], dtype=np.float32)
 
@@ -85,12 +82,9 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
             window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
             window_secs = len(window) / sample_rate
             text, elapsed_ms = _transcribe(window)
-            logger.info(f"window={window_secs:.1f}s  time={elapsed_ms:.0f}ms  rtf={elapsed_ms / (window_secs * 1000):.2f}x")
+            logger.info(f"{window_secs:.1f}s  {elapsed_ms:.0f}ms  {text}")
             if text:
-                print(f"\r{text}", flush=True)
                 yield audio_pb2.TranscriptionChunk(text=text)
-
-        print("\n--------------------------\n", flush=True)
 
         if DEBUG_SAVE_WAV:
             try:
