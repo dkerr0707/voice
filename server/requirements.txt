@@ -1,3 +1,8 @@
 grpcio==1.62.1
 grpcio-tools==1.62.1
 protobuf==4.25.3
+openai-whisper
+numpy==1.26.4
+requests
+huggingface_hub
+tqdm

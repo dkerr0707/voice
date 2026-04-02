@@ -7,7 +7,10 @@ import wave
 import io
 import datetime
 import logging
+import threading
+import numpy as np
 from concurrent import futures
+import whisper
 
 import audio_pb2
 import audio_pb2_grpc
@@ -17,6 +20,11 @@ PORT = 50051
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+logger.info("Loading Whisper medium model...")
+model = whisper.load_model("medium")
+whisper_lock = threading.Lock()
+logger.info("Whisper model ready.")
 
 
 def _pcm_to_wav(pcm_data: bytes, sample_rate: int, channels: int, bit_depth: int) -> bytes:
@@ -56,7 +64,15 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
 
             size_kb = len(wav_bytes) / 1024
             logger.info(f"Saved {os.path.basename(filename)} ({size_kb:.1f} KB)")
-            return audio_pb2.AudioResponse(success=True, message=f"Saved as {os.path.basename(filename)}")
+
+            audio_f32 = np.frombuffer(request.pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
+            logger.info("Transcribing...")
+            with whisper_lock:
+                result = model.transcribe(audio_f32, fp16=True, language="en")
+                text = result["text"].strip()
+                print(f"\n--- Transcription ---\n{text}\n---------------------\n", flush=True)
+
+            return audio_pb2.AudioResponse(success=True, message=text or "No speech detected")
 
         except Exception as e:
             logger.exception("Failed to process audio")

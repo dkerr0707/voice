@@ -1,6 +1,6 @@
 # Voice Recorder
 
-An Android app built with Kotlin and Jetpack Compose that records audio, plays it back on device, and uploads it to a Python gRPC server which saves it as a WAV file.
+An Android app built with Kotlin and Jetpack Compose that records audio, plays it back on device, uploads it to a Python gRPC server, and transcribes it locally using OpenAI Whisper.
 
 ## Features
 
@@ -8,6 +8,8 @@ An Android app built with Kotlin and Jetpack Compose that records audio, plays i
 - Playback the recording immediately after stopping
 - Audio kept in memory using `AudioRecord` and `AudioTrack` — no temp files
 - Uploads recording to a gRPC server in the background after each recording
+- Server transcribes audio locally using OpenAI Whisper (runs on GPU)
+- Recordings saved as timestamped WAV files
 
 ## Architecture
 
@@ -26,7 +28,7 @@ android/app/src/main/java/com/voice/recorder/
 
 server/
 ├── proto/audio.proto          # gRPC service definition
-├── server.py                  # Receives audio, saves as WAV
+├── server.py                  # Receives audio, transcribes, saves as WAV
 ├── requirements.txt
 └── generate_proto.sh          # Generates Python stubs
 ```
@@ -41,6 +43,7 @@ server/
 
 ### Server
 - Python 3.8+
+- NVIDIA GPU with CUDA (runs on CPU without one)
 - Device and server on the same network
 
 ## Setup
@@ -49,12 +52,13 @@ server/
 
 ```bash
 cd server
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 bash generate_proto.sh
 python server.py
 ```
 
-Recordings are saved to `server/recordings/` as timestamped WAV files.
+The Whisper medium model (~1.5 GB) downloads automatically on first run. Recordings are saved to `server/recordings/` as timestamped WAV files. Transcriptions print to the console as each recording is received.
 
 ### Android
 

@@ -23,7 +23,7 @@ object AudioUploadClient {
 
     suspend fun uploadPcm(
         pcmData: ByteArray,
-        sampleRate: Int = 44100,
+        sampleRate: Int = 16000,
         channels: Int = 1,
         bitDepth: Int = 16,
     ): Result<String> = withContext(Dispatchers.IO) {
