@@ -6,7 +6,7 @@ An Android app built with Kotlin and Jetpack Compose that records audio, streams
 
 - Record audio via the device microphone
 - Live transcription displayed in the app as you speak
-- Sliding window transcription — fast initial guesses refined by growing corrections
+- Sliding window transcription — Whisper re-transcribes a growing window every second, up to 15 seconds of context
 - Optional local playback (toggle, off by default)
 - Recordings can optionally be saved as WAV files (debug flag)
 - All audio kept in memory — no temp files on device
@@ -41,18 +41,27 @@ Transcription time vs audio clip length for the `medium` model on GPU (RTX 5060)
 
 ## How the Sliding Window Transcription Works
 
-Transcription uses a two-pass approach to balance responsiveness with accuracy:
+Every second, Whisper re-transcribes a window of audio and the result replaces the full displayed text in the app. The window grows until it reaches 15 seconds, then slides forward:
 
-1. **Fast pass (every 1 second):** Whisper transcribes only the most recent 1 second of audio. This appears immediately in the app but may be rough — short clips give Whisper little context.
+```
+t=1s   transcribes  [0s – 1s]
+t=2s   transcribes  [0s – 2s]
+t=3s   transcribes  [0s – 3s]
+  ...
+t=15s  transcribes  [0s – 15s]
+t=16s  transcribes  [1s – 16s]   ← window starts sliding
+t=17s  transcribes  [2s – 17s]
+t=18s  transcribes  [3s – 18s]
+  ...
+```
 
-2. **Verification pass (sliding window, capped at 15 seconds):** After each fast pass, Whisper re-transcribes the last 15 seconds of accumulated audio. With more context, it produces a significantly more accurate result. This correction replaces the full displayed text in the app.
+**Why this works well:**
+- Short clips (1–3s) give Whisper little context, so early results may be rough
+- As the window grows toward 15 seconds, Whisper has more context and accuracy improves significantly
+- Once the window is full, it slides forward maintaining a 15-second context at all times
+- The 15-second cap keeps transcription time bounded — without it the window would grow indefinitely and eventually take longer to transcribe than the 1-second step interval
 
-As you speak:
-- Fast text appears within ~1 second per word
-- Every second, the full visible text is silently replaced with a more accurate version
-- The longer you speak (up to 15 seconds of context), the better the corrections get
-
-The 15-second cap keeps transcription time bounded — without it, verification would eventually transcribe minutes of audio every second and never catch up.
+The displayed text always represents the most accurate transcription of the last 15 seconds of speech.
 
 ## Requirements
 

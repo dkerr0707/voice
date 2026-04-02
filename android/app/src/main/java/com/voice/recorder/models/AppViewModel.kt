@@ -27,9 +27,6 @@ class AppViewModel : ViewModel() {
     val playbackEnabled = MutableStateFlow(false)
     val transcription = MutableStateFlow("")
 
-    private var committedText = ""
-    private var pendingText = ""
-
     private var recordedAudio: ByteArray? = null
     private var recordingJob: Job? = null
 
@@ -42,8 +39,6 @@ class AppViewModel : ViewModel() {
     }
 
     private fun startRecording() {
-        committedText = ""
-        pendingText = ""
         transcription.value = ""
         recorderModel.startRecording()
         _state.value = RecorderState.RECORDING
@@ -64,14 +59,8 @@ class AppViewModel : ViewModel() {
             AudioUploadClient.streamPcm(
                 chunks = chunkChannel.receiveAsFlow(),
                 sampleRate = recorderModel.sampleRate,
-                onTranscription = { text, isCorrection ->
-                    if (isCorrection) {
-                        committedText = text
-                        pendingText = ""
-                    } else {
-                        pendingText += "$text "
-                    }
-                    transcription.value = "$committedText $pendingText".trim()
+                onTranscription = { text ->
+                    transcription.value = text
                 }
             ).onFailure { e ->
                 android.util.Log.w("AppViewModel", "Stream failed: ${e.message}")

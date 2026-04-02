@@ -27,7 +27,7 @@ object AudioUploadClient {
         sampleRate: Int = 16000,
         channels: Int = 1,
         bitDepth: Int = 16,
-        onTranscription: (text: String, isCorrection: Boolean) -> Unit,
+        onTranscription: (text: String) -> Unit,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val channel = buildChannel()
         try {
@@ -42,7 +42,7 @@ object AudioUploadClient {
                         .build()
                 }
             ).collect { transcriptionChunk ->
-                onTranscription(transcriptionChunk.text, transcriptionChunk.isCorrection)
+                onTranscription(transcriptionChunk.text)
             }
             Result.success(Unit)
         } catch (e: Exception) {

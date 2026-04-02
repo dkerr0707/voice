@@ -17,8 +17,8 @@ import audio_pb2_grpc
 
 SAVE_DIR = os.path.join(os.path.dirname(__file__), "recordings")
 PORT = 50051
-FAST_SECONDS = 1
-MAX_VERIFY_SECONDS = 15
+STEP_SECONDS = 1
+WINDOW_SECONDS = 15
 DEBUG_SAVE_WAV = os.environ.get("DEBUG_SAVE_WAV", "false").lower() == "true"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -53,7 +53,7 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
         logger.info(f"Stream started from {peer}")
 
         sample_rate = 16000
-        fast_buffer = np.array([], dtype=np.float32)
+        step_buffer = np.array([], dtype=np.float32)
         full_audio = np.array([], dtype=np.float32)
         full_pcm = bytearray()
 
@@ -64,31 +64,24 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
             full_pcm.extend(chunk.pcm_data)
 
             audio_f32 = np.frombuffer(chunk.pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
-            fast_buffer = np.concatenate([fast_buffer, audio_f32])
+            step_buffer = np.concatenate([step_buffer, audio_f32])
             full_audio = np.concatenate([full_audio, audio_f32])
 
-            if len(fast_buffer) >= sample_rate * FAST_SECONDS:
-                # Fast guess from the last second only
-                fast_text = _transcribe(fast_buffer)
-                if fast_text:
-                    print(fast_text, end=" ", flush=True)
-                    yield audio_pb2.TranscriptionChunk(text=fast_text, is_correction=False)
-                fast_buffer = np.array([], dtype=np.float32)
+            if len(step_buffer) >= sample_rate * STEP_SECONDS:
+                window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
+                text = _transcribe(window)
+                if text:
+                    print(f"\r{text}", flush=True)
+                    yield audio_pb2.TranscriptionChunk(text=text)
+                step_buffer = np.array([], dtype=np.float32)
 
-                # Sliding window correction: re-transcribe last MAX_VERIFY_SECONDS
-                verify_window = full_audio[-int(sample_rate * MAX_VERIFY_SECONDS):]
-                if len(verify_window) >= sample_rate * 2:
-                    corrected = _transcribe(verify_window)
-                    if corrected:
-                        print(f"\n[correction] {corrected}", flush=True)
-                        yield audio_pb2.TranscriptionChunk(text=corrected, is_correction=True)
-
-        # Transcribe any remaining audio
-        if len(fast_buffer) > sample_rate * 0.5:
-            final_text = _transcribe(fast_buffer)
-            if final_text:
-                print(final_text, flush=True)
-                yield audio_pb2.TranscriptionChunk(text=final_text, is_correction=False)
+        # Transcribe any remaining audio in the step buffer
+        if len(step_buffer) > sample_rate * 0.5:
+            window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
+            text = _transcribe(window)
+            if text:
+                print(f"\r{text}", flush=True)
+                yield audio_pb2.TranscriptionChunk(text=text)
 
         print("\n--------------------------\n", flush=True)
 
