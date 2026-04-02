@@ -34,3 +34,6 @@ server/generated/
 
 # Recorded audio files
 server/recordings/
+
+# Benchmark output
+server/benchmark_results.txt

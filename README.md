@@ -33,6 +33,12 @@ server/
 └── generate_proto.sh          # Generates Python stubs
 ```
 
+## Whisper Benchmark
+
+Transcription time vs audio clip length for the `medium` model on GPU (RTX 5060):
+
+![Whisper Benchmark](server/benchmark.png)
+
 ## How the Sliding Window Transcription Works
 
 Transcription uses a two-pass approach to balance responsiveness with accuracy:
