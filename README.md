@@ -1,4 +1,4 @@
-# Voice Recorder
+# Voice Transcription
 
 An Android app built with Kotlin and Jetpack Compose that records audio, streams it in real-time to a Python gRPC server, and displays a live transcription using OpenAI Whisper running locally on GPU.
 

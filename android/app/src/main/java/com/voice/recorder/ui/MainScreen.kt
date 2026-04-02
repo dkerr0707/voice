@@ -84,7 +84,7 @@ fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Voice Recorder",
+                text = "Voice Transcription",
                 style = MaterialTheme.typography.headlineMedium
             )
 
