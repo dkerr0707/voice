@@ -1,15 +1,15 @@
 # Voice Recorder
 
-An Android app built with Kotlin and Jetpack Compose that records audio, plays it back on device, uploads it to a Python gRPC server, and transcribes it locally using OpenAI Whisper.
+An Android app built with Kotlin and Jetpack Compose that records audio, streams it in real-time to a Python gRPC server, and displays a live transcription using OpenAI Whisper running locally on GPU.
 
 ## Features
 
 - Record audio via the device microphone
-- Playback the recording immediately after stopping
-- Audio kept in memory using `AudioRecord` and `AudioTrack` — no temp files
-- Uploads recording to a gRPC server in the background after each recording
-- Server transcribes audio locally using OpenAI Whisper (runs on GPU)
-- Recordings saved as timestamped WAV files
+- Live transcription displayed in the app as you speak
+- Sliding window transcription — fast initial guesses refined by growing corrections
+- Optional local playback (toggle, off by default)
+- Recordings can optionally be saved as WAV files (debug flag)
+- All audio kept in memory — no temp files on device
 
 ## Architecture
 
@@ -19,19 +19,34 @@ MVVM with no XML layouts — all UI is written in Jetpack Compose.
 android/app/src/main/java/com/voice/recorder/
 ├── MainActivity.kt
 ├── models/
-│   ├── AppViewModel.kt        # State machine, coordinates models
-│   ├── AudioRecorderModel.kt  # Captures PCM audio via AudioRecord
-│   ├── AudioPlayerModel.kt    # Plays back PCM audio via AudioTrack
-│   └── AudioUploadClient.kt   # gRPC client, uploads PCM to server
+│   ├── AppViewModel.kt        # State machine, transcription state
+│   ├── AudioRecorderModel.kt  # Captures PCM via AudioRecord, emits Flow<ByteArray>
+│   ├── AudioPlayerModel.kt    # Plays back PCM via AudioTrack
+│   └── AudioUploadClient.kt   # Bidirectional gRPC streaming client
 └── ui/
-    └── MainScreen.kt          # Compose UI
+    └── MainScreen.kt          # Compose UI with live transcription box
 
 server/
 ├── proto/audio.proto          # gRPC service definition
-├── server.py                  # Receives audio, transcribes, saves as WAV
+├── server.py                  # Receives audio, transcribes, streams text back
 ├── requirements.txt
 └── generate_proto.sh          # Generates Python stubs
 ```
+
+## How the Sliding Window Transcription Works
+
+Transcription uses a two-pass approach to balance responsiveness with accuracy:
+
+1. **Fast pass (every 1 second):** Whisper transcribes only the most recent 1 second of audio. This appears immediately in the app but may be rough — short clips give Whisper little context.
+
+2. **Verification pass (sliding window, capped at 15 seconds):** After each fast pass, Whisper re-transcribes the last 15 seconds of accumulated audio. With more context, it produces a significantly more accurate result. This correction replaces the full displayed text in the app.
+
+As you speak:
+- Fast text appears within ~1 second per word
+- Every second, the full visible text is silently replaced with a more accurate version
+- The longer you speak (up to 15 seconds of context), the better the corrections get
+
+The 15-second cap keeps transcription time bounded — without it, verification would eventually transcribe minutes of audio every second and never catch up.
 
 ## Requirements
 
@@ -43,8 +58,8 @@ server/
 
 ### Server
 - Python 3.8+
-- NVIDIA GPU with CUDA (runs on CPU without one)
-- Device and server on the same network
+- NVIDIA GPU with CUDA (runs on CPU without one, but much slower)
+- Device and server on the same WiFi network
 
 ## Setup
 
@@ -58,7 +73,11 @@ bash generate_proto.sh
 python server.py
 ```
 
-The Whisper medium model (~1.5 GB) downloads automatically on first run. Recordings are saved to `server/recordings/` as timestamped WAV files. Transcriptions print to the console as each recording is received.
+Transcriptions print to the console in real-time. To also save recordings as WAV files:
+
+```bash
+DEBUG_SAVE_WAV=true python server.py
+```
 
 ### Android
 
@@ -74,4 +93,4 @@ This will build, install, and launch the app on a connected device or emulator.
 ## Permissions
 
 - `RECORD_AUDIO` — requested at runtime on first launch
-- `INTERNET` — required for gRPC upload
+- `INTERNET` — required for gRPC streaming

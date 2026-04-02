@@ -3,17 +3,25 @@ package com.voice.recorder.ui
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +44,8 @@ import com.voice.recorder.models.RecorderState
 @Composable
 fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
     val state by audioViewModel.state.collectAsState()
+    val playbackEnabled by audioViewModel.playbackEnabled.collectAsState()
+    val transcription by audioViewModel.transcription.collectAsState()
     val context = LocalContext.current
 
     var hasAudioPermission by remember {
@@ -57,6 +67,11 @@ fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
         }
     }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(transcription) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -73,7 +88,7 @@ fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
                 style = MaterialTheme.typography.headlineMedium
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
@@ -95,14 +110,14 @@ fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
                 Text(
                     text = when (state) {
                         RecorderState.IDLE -> "Record"
-                        RecorderState.RECORDING -> "Stop & Play"
+                        RecorderState.RECORDING -> "Stop"
                         RecorderState.PLAYING -> "Stop"
                     },
                     style = MaterialTheme.typography.labelLarge
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = when (state) {
@@ -113,6 +128,47 @@ fun MainScreen(audioViewModel: AppViewModel = viewModel()) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(12.dp)
+                    .verticalScroll(scrollState)
+            ) {
+                Text(
+                    text = transcription.ifEmpty { "Transcription will appear here..." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (transcription.isEmpty())
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Playback",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Switch(
+                    checked = playbackEnabled,
+                    onCheckedChange = { audioViewModel.playbackEnabled.value = it },
+                    enabled = state == RecorderState.IDLE
+                )
+            }
         }
     }
 }

@@ -7,17 +7,17 @@ option java_outer_classname = "AudioProto";
 option java_multiple_files = true;
 
 service AudioService {
-  rpc UploadAudio (AudioRequest) returns (AudioResponse);
+  rpc StreamAudio (stream AudioChunk) returns (stream TranscriptionChunk);
 }
 
-message AudioRequest {
+message AudioChunk {
   bytes  pcm_data    = 1;
   int32  sample_rate = 2;
   int32  channels    = 3;
   int32  bit_depth   = 4;
 }
 
-message AudioResponse {
-  bool   success = 1;
-  string message = 2;
+message TranscriptionChunk {
+  string text         = 1;
+  bool   is_correction = 2;
 }

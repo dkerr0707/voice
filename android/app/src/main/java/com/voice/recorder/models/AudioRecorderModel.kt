@@ -4,8 +4,9 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 
 class AudioRecorderModel {
 
@@ -35,20 +36,16 @@ class AudioRecorderModel {
         isRecording = true
     }
 
-    suspend fun readRecordingData(): ByteArray = withContext(Dispatchers.IO) {
+    fun recordingFlow(): Flow<ByteArray> = flow {
         val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
         val buffer = ByteArray(bufferSize)
-        val output = ByteArrayOutputStream()
-
         while (isRecording) {
             val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
             if (bytesRead > 0) {
-                output.write(buffer, 0, bytesRead)
+                emit(buffer.copyOf(bytesRead))
             }
         }
-
-        output.toByteArray()
-    }
+    }.flowOn(Dispatchers.IO)
 
     fun stopRecording() {
         isRecording = false

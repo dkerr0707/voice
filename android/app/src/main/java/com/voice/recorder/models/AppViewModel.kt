@@ -2,12 +2,13 @@ package com.voice.recorder.models
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.voice.recorder.models.AudioPlayerModel
-import com.voice.recorder.models.AudioRecorderModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 
 enum class RecorderState { IDLE, RECORDING, PLAYING }
 
@@ -23,6 +24,12 @@ class AppViewModel : ViewModel() {
     private val _state = MutableStateFlow(RecorderState.IDLE)
     val state: StateFlow<RecorderState> = _state
 
+    val playbackEnabled = MutableStateFlow(false)
+    val transcription = MutableStateFlow("")
+
+    private var committedText = ""
+    private var pendingText = ""
+
     private var recordedAudio: ByteArray? = null
     private var recordingJob: Job? = null
 
@@ -35,11 +42,40 @@ class AppViewModel : ViewModel() {
     }
 
     private fun startRecording() {
+        committedText = ""
+        pendingText = ""
+        transcription.value = ""
         recorderModel.startRecording()
         _state.value = RecorderState.RECORDING
 
+        val chunkChannel = Channel<ByteArray>(Channel.BUFFERED)
+
         recordingJob = viewModelScope.launch {
-            recordedAudio = recorderModel.readRecordingData()
+            val buffer = ByteArrayOutputStream()
+            recorderModel.recordingFlow().collect { chunk ->
+                buffer.write(chunk)
+                chunkChannel.send(chunk)
+            }
+            chunkChannel.close()
+            recordedAudio = buffer.toByteArray()
+        }
+
+        viewModelScope.launch {
+            AudioUploadClient.streamPcm(
+                chunks = chunkChannel.receiveAsFlow(),
+                sampleRate = recorderModel.sampleRate,
+                onTranscription = { text, isCorrection ->
+                    if (isCorrection) {
+                        committedText = text
+                        pendingText = ""
+                    } else {
+                        pendingText += "$text "
+                    }
+                    transcription.value = "$committedText $pendingText".trim()
+                }
+            ).onFailure { e ->
+                android.util.Log.w("AppViewModel", "Stream failed: ${e.message}")
+            }
         }
     }
 
@@ -50,17 +86,7 @@ class AppViewModel : ViewModel() {
         viewModelScope.launch {
             recordingJob?.join()
             val audio = recordedAudio
-            if (audio != null && audio.isNotEmpty()) {
-                viewModelScope.launch {
-                    AudioUploadClient.uploadPcm(
-                        pcmData = audio,
-                        sampleRate = recorderModel.sampleRate,
-                        channels = 1,
-                        bitDepth = 16,
-                    ).onFailure { e ->
-                        android.util.Log.w("AppViewModel", "Upload failed: ${e.message}")
-                    }
-                }
+            if (audio != null && audio.isNotEmpty() && playbackEnabled.value) {
                 playerModel.play(audio) {
                     _state.value = RecorderState.IDLE
                 }
