@@ -8,6 +8,7 @@ import io
 import datetime
 import logging
 import threading
+import time
 import numpy as np
 from concurrent import futures
 import whisper
@@ -17,8 +18,8 @@ import audio_pb2_grpc
 
 SAVE_DIR = os.path.join(os.path.dirname(__file__), "recordings")
 PORT = 50051
-STEP_SECONDS = 1
-WINDOW_SECONDS = 15
+STEP_SECONDS = 0.5
+WINDOW_SECONDS = 10
 DEBUG_SAVE_WAV = os.environ.get("DEBUG_SAVE_WAV", "false").lower() == "true"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -40,10 +41,12 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int, channels: int, bit_depth: int
     return buf.getvalue()
 
 
-def _transcribe(audio_f32: np.ndarray) -> str:
+def _transcribe(audio_f32: np.ndarray) -> tuple[str, float]:
+    start = time.perf_counter()
     with whisper_lock:
         result = model.transcribe(audio_f32, fp16=True, language="en")
-        return result["text"].strip()
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    return result["text"].strip(), elapsed_ms
 
 
 class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
@@ -69,7 +72,9 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
 
             if len(step_buffer) >= sample_rate * STEP_SECONDS:
                 window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
-                text = _transcribe(window)
+                window_secs = len(window) / sample_rate
+                text, elapsed_ms = _transcribe(window)
+                logger.info(f"window={window_secs:.1f}s  time={elapsed_ms:.0f}ms  rtf={elapsed_ms / (window_secs * 1000):.2f}x")
                 if text:
                     print(f"\r{text}", flush=True)
                     yield audio_pb2.TranscriptionChunk(text=text)
@@ -78,7 +83,9 @@ class AudioServiceServicer(audio_pb2_grpc.AudioServiceServicer):
         # Transcribe any remaining audio in the step buffer
         if len(step_buffer) > sample_rate * 0.5:
             window = full_audio[-int(sample_rate * WINDOW_SECONDS):]
-            text = _transcribe(window)
+            window_secs = len(window) / sample_rate
+            text, elapsed_ms = _transcribe(window)
+            logger.info(f"window={window_secs:.1f}s  time={elapsed_ms:.0f}ms  rtf={elapsed_ms / (window_secs * 1000):.2f}x")
             if text:
                 print(f"\r{text}", flush=True)
                 yield audio_pb2.TranscriptionChunk(text=text)
